@@ -114,18 +114,30 @@ const { join } = require('path');
 const { isMaster } = require('cluster');
 const { fork } = require('child_process');
 const { app, BrowserWindow, ipcMain } = require('electron');
+const fileSchemeTester = /^file:/;
 
 const windows = [];
 
 function createNewWindow(theUrl) {
-    const newWindow = new BrowserWindow({ width: 1024, height: 728, show: !!theUrl });
+    const config = {
+        width: 1024,
+        height: 728,
+        show: !!theUrl
+    };
+
+    if (!!theUrl && !fileSchemeTester.test(theUrl)) {
+        config.webPreferences = {
+            // nodeIntegration: false,
+            // contextIsolation: true,
+        };
+    };
+
+    const newWindow = new BrowserWindow(config);
     if (windows.length === 0) {
         newWindow.webContents.on('new-window', (event, url, frameName, disposition, options) => {
             // If the first electron window isn't visible, then all other new windows will remain invisible.
             // https://github.com/electron/electron/issues/3751
-            options.show = true;
-            options.width = 1024;
-            options.height = 728;
+            Object.assign(options, config);
         });
     }
     windows.push(newWindow);
@@ -157,7 +169,7 @@ if (isMaster) {
     });
     app.on('ready', () => {
         // Check whether we are in bundled application or development mode.
-        const devMode = process.defaultApp || /node_modules[\/]electron[\/]/.test(process.execPath);
+        const devMode = process.defaultApp || /node_modules[\\/]electron[\\/]/.test(process.execPath);
         const mainWindow = createNewWindow();
         const loadMainWindow = (port) => {
             mainWindow.loadURL('file://' + join(__dirname, '../../lib/index.html') + '?port=' + port);
