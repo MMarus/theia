@@ -24,7 +24,7 @@ import {
 import { KeybindingContribution, KeybindingRegistry, QuickOpenService, QuickOpenModel, QuickOpenItem, QuickOpenMode, StorageService } from '../../browser';
 import { CommonMenus } from '../../browser';
 import { WindowService } from '../../browser/window/window-service';
-import { delay } from '../../common/promise-util';
+import { timeout } from '../../common/promise-util';
 
 export namespace ElectronRemoteCommands {
     export const CONNECT_TO_REMOTE: Command = {
@@ -134,7 +134,7 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
     protected async computeHistoryCache(): Promise<ResponseStatus[]> {
         const cache: ResponseStatus[] = [];
         this.accumulateStatus(cache, await this.history);
-        await delay(this.timeout);
+        await timeout(this.timeout);
         return cache.slice(0);
     }
 
@@ -142,8 +142,12 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
         const autocompleteStatus: ResponseStatus[] = [];
         const defaultSchemes = ['http', 'https'];
         const autocomplete = [];
+        const items = [];
 
         if (lookFor) {
+            items.push(this.convertUrlToQuickOpenItem(lookFor, `Direct connect`));
+
+            // Autocompletion (http/https)
             let url = new URI(lookFor);
             if (!this.schemeTest.test(url.scheme)) {
                 const reformated = new URI(`//${lookFor}`);
@@ -153,14 +157,11 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
                 }
             }
 
+            // Host polling
             this.accumulateStatus(autocompleteStatus, autocomplete);
-            await delay(this.timeout);
+            await timeout(this.timeout);
         }
 
-        const items = [];
-        if (lookFor) {
-            items.push(this.convertUrlToQuickOpenItem(lookFor, `Direct connect`));
-        }
         items.push(...
             [...autocompleteStatus, ...await this.historyCache]
                 // for some reason the sorting seems to be without effect

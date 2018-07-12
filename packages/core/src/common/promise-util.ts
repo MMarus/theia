@@ -29,18 +29,11 @@ export class Deferred<T> {
 }
 
 /**
- * Simple timeout-as-promise implementation, can be cancelled.
+ * Simple timeout-as-promise implementation.
  *
  * @param time delay to wait for
- * @param value value to resolve to after the delay
+ * @param value value to resolve to after the timeout
  */
-export function delay<T>(time: Number, value?: T): CancellablePromise<T> {
-    const deferred = new Deferred<T>();
-    setTimeout(deferred.resolve, time, value);
-    (deferred.promise as CancellablePromise<T>).cancel = deferred.reject;
-    return deferred.promise;
-}
-
-export interface CancellablePromise<T> extends Promise<T> {
-    cancel?: (error: Error) => void;
+export function timeout<T = void>(time: Number, value?: T): Promise<T> {
+    return new Promise(resolve => setTimeout(resolve, time, value));
 }

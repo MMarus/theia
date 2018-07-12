@@ -31,7 +31,7 @@ export class BackendGenerator extends AbstractGenerator {
     }
 
     protected compileMiddleware(backendModules: Map<string, string>): string {
-        return this.pck.isHybrid ? `
+        return this.pck.isHybrid() ? `
         const electron = ${this.compileExpressStatic('/electron')};
         const browser = ${this.compileExpressStatic('/browser')};
 
