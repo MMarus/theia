@@ -173,6 +173,7 @@ if (isMaster) {
         const mainWindow = createNewWindow();
         const loadMainWindow = (port) => {
             mainWindow.loadURL('file://' + join(__dirname, '../../lib/index.html') + '?port=' + port);
+            // mainWindow.loadURL(\`http://localhost:\${port}\`);
         };
         const mainPath = join(__dirname, '..', 'backend', 'main');
         // We need to distinguish between bundled application and development mode when starting the clusters.

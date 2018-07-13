@@ -35,15 +35,26 @@ const uriFromPath = (filePath: string) => {
     return encodeURI('file://' + pathName);
 };
 
+const isHttp = /https?:/.test(self.location.href);
+// console.log('http?', isHttp);
+
 export default loadVsRequire(global)
     .then(vsRequire => {
-        const baseUrl = uriFromPath(__dirname);
+        const baseUrl = isHttp ? self.location.href : uriFromPath(__dirname);
         vsRequire.config({ baseUrl });
 
         // workaround monaco-css not understanding the environment
         s.module = undefined;
         // workaround monaco-typescript not understanding the environment
         s.process.browser = true;
+
+        // vscode-loader monkey-patching
+        if (isHttp) {
+            Object.defineProperty(s.AMDLoader.Environment.prototype, 'isNode', {
+                get: () => false
+            });
+        }
+
         return loadMonaco(vsRequire);
     })
     .then(() => import('../browser/monaco-frontend-module'))
