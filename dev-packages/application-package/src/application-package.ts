@@ -40,7 +40,7 @@ export class ApplicationPackage {
 
     static defaultConfig: ApplicationPackageConfig = {
         ...NpmRegistry.defaultConfig,
-        target: 'hybrid'
+        target: 'browser'
     };
 
     readonly projectPath: string;
