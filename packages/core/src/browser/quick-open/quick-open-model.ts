@@ -43,9 +43,14 @@ export interface QuickOpenItemOptions {
     run?(mode: QuickOpenMode): boolean;
 }
 
+export interface QuickOpenGroupItemOptions extends QuickOpenItemOptions {
+    groupLabel?: string;
+    showBorder?: boolean;
+}
+
 export class QuickOpenItem {
 
-    private options: QuickOpenItemOptions;
+    protected options: QuickOpenItemOptions;
 
     constructor(options?: QuickOpenItemOptions) {
         this.options = options || {};
@@ -73,7 +78,7 @@ export class QuickOpenItem {
         return this.options.detailHighlights;
     }
     isHidden(): boolean {
-        return this.options.hidden || false;
+        return !!this.options.hidden;
     }
     getUri(): URI | undefined {
         return this.options.uri;
@@ -93,11 +98,18 @@ export class QuickOpenItem {
 }
 
 export class QuickOpenGroupItem extends QuickOpenItem {
+
+    protected options: QuickOpenGroupItemOptions;
+
+    constructor(options?: QuickOpenGroupItemOptions) {
+        super(options);
+    }
+
     getGroupLabel(): string | undefined {
-        return undefined;
+        return this.options.groupLabel;
     }
     showBorder(): boolean {
-        return false;
+        return !!this.options.showBorder;
     }
 }
 

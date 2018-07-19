@@ -14,17 +14,20 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import Axios, { AxiosRequestConfig } from 'axios';
 import { inject, injectable } from 'inversify';
+import Axios, { AxiosResponse } from 'axios';
 import URI from '../../common/uri';
 import {
     Command, CommandContribution, CommandRegistry,
     MenuModelRegistry, MenuContribution, ILogger
 } from '../../common';
-import { KeybindingContribution, KeybindingRegistry, QuickOpenService, QuickOpenModel, QuickOpenItem, QuickOpenMode, StorageService } from '../../browser';
+import {
+    StorageService, KeybindingContribution, KeybindingRegistry,
+    QuickOpenService, QuickOpenModel, QuickOpenItem, QuickOpenMode, QuickOpenGroupItem, QuickOpenGroupItemOptions
+} from '../../browser';
 import { CommonMenus } from '../../browser';
 import { WindowService } from '../../browser/window/window-service';
-import { timeout } from '../../common/promise-util';
+import { timeout as delay } from '../../common/promise-util';
 
 export namespace ElectronRemoteCommands {
     export const CONNECT_TO_REMOTE: Command = {
@@ -45,20 +48,90 @@ export namespace ElectronRemoteHistory {
     export const KEY = 'theia.remote.history';
 }
 
-export interface ResponseStatus {
-    url: string;
-    status?: string;
-    error?: Error;
+export enum RemoteEntryGroups {
+    Input = 0,
+    Autocomplete,
+    History,
 }
-export namespace ResponseStatus {
-    export function OK(status: ResponseStatus): boolean {
-        return status.status ? /^2/.test(status.status) : false;
-    }
-    export function display(status: ResponseStatus): string {
-        if (!status.error && !status.status) {
-            status.error = new Error('Unresolved');
+
+// tslint:disable-next-line:no-any
+export type Response<T = any> = AxiosResponse<T>;
+export interface RemoteEntry {
+    url: string;
+
+    group?: string;
+    response?: Response;
+
+    poll(timeout?: number): Promise<Response>;
+
+    hasError(): boolean;
+    hasResponse(): boolean;
+    isOk(): boolean;
+
+    getStatusText(): string;
+
+    clear(): void;
+}
+export class CachedRemoteEntry implements RemoteEntry {
+
+    protected _response?: Response;
+    protected _error?: Error;
+
+    constructor(
+        public url: string,
+        public group?: string,
+    ) { }
+
+    async poll(timeout?: number): Promise<Response> {
+        if (this._error) {
+            throw this._error;
         }
-        return status.error ? `Error: ${status.error.message}` : `Status: ${status.status}`;
+        if (this._response) {
+            return this._response;
+        }
+        try {
+            return this._response = await Axios.get(this.url, { timeout });
+        } catch (error) {
+            throw this._error = error;
+        }
+    }
+
+    get response(): CachedRemoteEntry['_response'] {
+        if (this._error) {
+            throw this._error;
+        }
+        return this._response;
+    }
+
+    hasError(): boolean {
+        return typeof this._error !== 'undefined';
+    }
+
+    hasResponse(): boolean {
+        return typeof this.response !== 'undefined';
+    }
+
+    isOk(): boolean {
+        return !this.hasError()
+            && this.hasResponse()
+            && /^2/.test(this.response!.status.toString());
+    }
+
+    getStatusText(): string {
+        try {
+            const response = this.response;
+            if (response) {
+                return response.statusText || 'Online';
+            }
+            return 'Unresolved';
+        } catch (error) {
+            return error.message;
+        }
+    }
+
+    clear(): void {
+        this._response = undefined;
+        this._error = undefined;
     }
 }
 
@@ -70,8 +143,7 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
     @inject(WindowService) protected readonly windowService: WindowService;
     @inject(ILogger) protected readonly logger: ILogger;
 
-    protected historyCache: Promise<ResponseStatus[]>;
-    protected schemeTest: RegExp = /^https?$/;
+    protected historyEntries: Promise<RemoteEntry[]>;
     protected timeout: number = 500; // ms
 
     protected get history(): Promise<string[]> {
@@ -84,12 +156,11 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
         const encoded = encodeURI(url);
         if (encoded) {
             const currentIndex = history.indexOf(encoded);
-            if (currentIndex !== -1) {
-                history.splice(currentIndex, 1);
+            if (currentIndex === -1) {
+                history.unshift(encoded);
             }
 
-            history.push(encoded);
-            return this.localStorageService.setData(ElectronRemoteHistory.KEY, history);
+            this.localStorageService.setData(ElectronRemoteHistory.KEY, history);
         }
     }
 
@@ -97,85 +168,97 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
         return this.localStorageService.setData(ElectronRemoteHistory.KEY, undefined);
     }
 
-    protected async getHttpStatus(url: string, config?: AxiosRequestConfig): Promise<ResponseStatus> {
-        try {
-            return Axios.get<string>(url, config)
-                .then(response => ({ url, status: response.statusText }))
-                .catch(error => ({ url, error }));
-        } catch (error) { // in case the async-request creation itself failed
-            return { url, error };
-        }
+    protected async computeHistoryCache(): Promise<RemoteEntry[]> {
+        const history = (await this.history).map(url => new CachedRemoteEntry(url, RemoteEntryGroups[RemoteEntryGroups.History]));
+        return this.accumulateResponses(history, this.timeout);
     }
 
-    protected convertUrlToQuickOpenItem(url: string, description?: string): QuickOpenItem {
-        return new QuickOpenItem({
-            label: url,
-            description,
-            run: mode => {
-                if (mode === QuickOpenMode.OPEN) {
-                    this.windowService.openNewWindow(url);
-                    this.remember(url);
-                }
-                return true;
-            }
+    protected async accumulateResponses(input: RemoteEntry[], timeout: number): Promise<RemoteEntry[]> {
+        const output: RemoteEntry[] = [];
+        Promise.all(input
+            .map(async entry => {
+                await entry.poll(timeout).catch(e => void 0);
+                output.push(entry);
+            })
+        );
+        await delay(timeout);
+        return output.slice(0);
+    }
+
+    protected urlOpener = (url: string) => (mode: QuickOpenMode): boolean => {
+        if (mode === QuickOpenMode.OPEN) {
+            this.windowService.openNewWindow(url);
+            this.remember(url);
+        }
+        return true;
+    }
+
+    protected convertEntryToQuickOpenItem(entry: RemoteEntry, override: QuickOpenGroupItemOptions = {}): QuickOpenItem {
+        return new QuickOpenGroupItem({
+            label: entry.url,
+            groupLabel: entry.group,
+            description: entry.getStatusText(),
+            run: this.urlOpener(entry.url),
+            ...override,
         });
     }
 
-    protected async accumulateStatus(accumulator: ResponseStatus[], urls: string[]): Promise<void> {
-        await Promise.all(urls
-            .map(url => this.getHttpStatus(url, { timeout: this.timeout })
-                .then(status => {
-                    accumulator.push(status);
-                })
-            )
-        );
-    }
-
-    protected async computeHistoryCache(): Promise<ResponseStatus[]> {
-        const cache: ResponseStatus[] = [];
-        this.accumulateStatus(cache, await this.history);
-        await timeout(this.timeout);
-        return cache.slice(0);
-    }
-
     async onType(lookFor: string, acceptor: (items: QuickOpenItem[]) => void): Promise<void> {
-        const autocompleteStatus: ResponseStatus[] = [];
         const defaultSchemes = ['http', 'https'];
-        const autocomplete = [];
+        const inputResponses = [];
+        const inputEntries = [];
         const items = [];
 
         if (lookFor) {
-            items.push(this.convertUrlToQuickOpenItem(lookFor, `Direct connect`));
+            let url = new URI(lookFor);
 
             // Autocompletion (http/https)
-            let url = new URI(lookFor);
-            if (!this.schemeTest.test(url.scheme)) {
+            if (!/^https?$/.test(url.scheme)) {
                 const reformated = new URI(`//${lookFor}`);
                 for (const scheme of defaultSchemes) {
                     url = reformated.withScheme(scheme);
-                    autocomplete.push(url.toString());
+                    inputEntries.push(
+                        new CachedRemoteEntry(url.toString(), RemoteEntryGroups[RemoteEntryGroups.Autocomplete])
+                    );
                 }
+            } else {
+                inputEntries.push(
+                    new CachedRemoteEntry(url.toString(), RemoteEntryGroups[RemoteEntryGroups.Input])
+                );
             }
 
             // Host polling
-            this.accumulateStatus(autocompleteStatus, autocomplete);
-            await timeout(this.timeout);
+            inputResponses.push(...await this.accumulateResponses(inputEntries, this.timeout));
         }
 
-        items.push(...
-            [...autocompleteStatus, ...await this.historyCache]
-                // for some reason the sorting seems to be without effect
-                .sort((a, b) => ResponseStatus.OK(a) === ResponseStatus.OK(b) ?
-                    0 : ResponseStatus.OK(a) ? -1 : 1)
-                .map(status => this.convertUrlToQuickOpenItem(status.url, ResponseStatus.display(status)))
-        );
+        const sortedEntries = [...inputResponses, ...await this.historyEntries]
+            .filter((entry, index, array) => array.findIndex(e => e.url === entry.url) === index) // make unique
+            .sort((a, b) => { // place OK responses first
+                if (a.isOk() && b.isOk()) {
+                    return 0;
+                } else if (a.isOk()) {
+                    return -1;
+                } else {
+                    return 1;
+                }
+            })
+            .map((entry, index, array) => { // place a separator between OK and Error responses
+                const previous = array[index - 1];
+                const options: QuickOpenGroupItemOptions = {};
+                if (previous && previous.isOk() && !entry.isOk()) {
+                    options.showBorder = true;
+                }
+                return this.convertEntryToQuickOpenItem(entry, options);
+            });
+
+        items.push(...sortedEntries);
         acceptor(items);
     }
 
     registerCommands(registry: CommandRegistry): void {
         registry.registerCommand(ElectronRemoteCommands.CONNECT_TO_REMOTE, {
             execute: () => {
-                this.historyCache = this.computeHistoryCache();
+                this.historyEntries = this.computeHistoryCache();
                 this.quickOpenService.open(this, {
                     placeholder: 'Type the URL to connect to...',
                     fuzzyMatchLabel: true,
