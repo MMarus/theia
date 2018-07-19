@@ -28,25 +28,7 @@ import {
 import { CommonMenus } from '../../browser';
 import { WindowService } from '../../browser/window/window-service';
 import { timeout as delay } from '../../common/promise-util';
-
-export namespace ElectronRemoteCommands {
-    export const CONNECT_TO_REMOTE: Command = {
-        id: 'electron.remote.connect',
-        label: 'Remote: Connect to a Server'
-    };
-    export const CLEAR_REMOTE_HISTORY: Command = {
-        id: 'electron.remote.history.clear',
-        label: 'Remote: Clear host history'
-    };
-}
-
-export namespace ElectronMenus {
-    export const CONNECT_TO_REMOTE = [...CommonMenus.FILE_OPEN, 'z_connect'];
-}
-
-export namespace ElectronRemoteHistory {
-    export const KEY = 'theia.remote.history';
-}
+import { ConnectionStateService } from './connection-state-service';
 
 export enum RemoteEntryGroups {
     Input = 0,
@@ -138,6 +120,7 @@ export class CachedRemoteEntry implements RemoteEntry {
 @injectable()
 export class ElectronRemoteContribution implements QuickOpenModel, CommandContribution, MenuContribution, KeybindingContribution {
 
+    @inject(ConnectionStateService) protected readonly connectionState: ConnectionStateService;
     @inject(StorageService) protected readonly localStorageService: StorageService;
     @inject(QuickOpenService) protected readonly quickOpenService: QuickOpenService;
     @inject(WindowService) protected readonly windowService: WindowService;
@@ -207,12 +190,22 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
         const defaultSchemes = ['http', 'https'];
         const inputResponses = [];
         const inputEntries = [];
-        const items = [];
+        const items: QuickOpenItem[] = [];
+
+        // Add a way to open a local electron window
+        if (this.connectionState.isRemote()) {
+            items.push(new QuickOpenGroupItem({
+                label: 'Localhost Application',
+                groupLabel: 'Electron',
+                description: 'Electron',
+                run: this.urlOpener('localhost'),
+            }));
+        }
 
         if (lookFor) {
             let url = new URI(lookFor);
 
-            // Autocompletion (http/https)
+            // Autocompletion (http/https) if not using http(s) filescheme
             if (!/^https?$/.test(url.scheme)) {
                 const reformated = new URI(`//${lookFor}`);
                 for (const scheme of defaultSchemes) {
@@ -231,10 +224,13 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
             inputResponses.push(...await this.accumulateResponses(inputEntries, this.timeout));
         }
 
+        // Sorting the autocompletion and history based on the status of the responses
         const sortedEntries = [...inputResponses, ...await this.historyEntries]
-            .filter((entry, index, array) => array.findIndex(e => e.url === entry.url) === index) // make unique
-            .sort((a, b) => { // place OK responses first
-                if (a.isOk() && b.isOk()) {
+            // make unique
+            .filter((entry, index, array) => array.findIndex(e => e.url === entry.url) === index)
+            // place OK responses first
+            .sort((a, b) => {
+                if (a.isOk() === b.isOk()) {
                     return 0;
                 } else if (a.isOk()) {
                     return -1;
@@ -242,7 +238,8 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
                     return 1;
                 }
             })
-            .map((entry, index, array) => { // place a separator between OK and Error responses
+            // place a separator between OK and Error responses
+            .map((entry, index, array) => {
                 const previous = array[index - 1];
                 const options: QuickOpenGroupItemOptions = {};
                 if (previous && previous.isOk() && !entry.isOk()) {
@@ -265,6 +262,15 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
                 });
             }
         });
+
+        registry.registerCommand(ElectronRemoteCommands.DISCONNECT_FROM_REMOTE, {
+            isEnabled: () => this.connectionState.isRemote(),
+            isVisible: () => this.connectionState.isRemote(),
+            execute: () => {
+                this.windowService.openNewWindow('localhost');
+                close();
+            },
+        });
         registry.registerCommand(ElectronRemoteCommands.CLEAR_REMOTE_HISTORY, {
             execute: () => this.clearHistory()
         });
@@ -278,9 +284,39 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
     }
 
     registerMenus(registry: MenuModelRegistry) {
-        registry.registerMenuAction(ElectronMenus.CONNECT_TO_REMOTE, {
+        registry.registerMenuAction(ElectronMenus.ELECTRON_REMOTE, {
             commandId: ElectronRemoteCommands.CONNECT_TO_REMOTE.id,
             order: 'z4',
         });
+        // Do not load the disconnect button if we are not on a remote server
+        if (this.connectionState.isRemote()) {
+            registry.registerMenuAction(ElectronMenus.ELECTRON_REMOTE, {
+                commandId: ElectronRemoteCommands.DISCONNECT_FROM_REMOTE.id,
+                order: 'z5',
+            });
+        }
     }
+}
+
+export namespace ElectronRemoteCommands {
+    export const CONNECT_TO_REMOTE: Command = {
+        id: 'electron.remote.connect',
+        label: 'Remote: Connect to a Server'
+    };
+    export const CLEAR_REMOTE_HISTORY: Command = {
+        id: 'electron.remote.history.clear',
+        label: 'Remote: Clear host history'
+    };
+    export const DISCONNECT_FROM_REMOTE: Command = {
+        id: 'electron.remote.disconnect',
+        label: 'Remote: Disconnect',
+    };
+}
+
+export namespace ElectronMenus {
+    export const ELECTRON_REMOTE = [...CommonMenus.FILE_OPEN, 'z_connect'];
+}
+
+export namespace ElectronRemoteHistory {
+    export const KEY = 'theia.remote.history';
 }

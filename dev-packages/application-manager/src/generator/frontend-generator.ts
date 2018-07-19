@@ -114,9 +114,19 @@ const { join } = require('path');
 const { isMaster } = require('cluster');
 const { fork } = require('child_process');
 const { app, BrowserWindow, ipcMain } = require('electron');
+const EventEmitter = require('events');
 const fileSchemeTester = /^file:/;
 
+const localUriEvent = new EventEmitter();
+let localUri = undefined;
 const windows = [];
+
+function setLocalUri(uri) {
+    localUriEvent.emit('update', localUri = uri);
+}
+function resolveLocalUriFromPort(port) {
+    setLocalUri('file://' + join(__dirname, '../../lib/index.html') + '?port=' + port);
+}
 
 function createNewWindow(theUrl) {
     const config = {
@@ -124,6 +134,11 @@ function createNewWindow(theUrl) {
         height: 728,
         show: !!theUrl
     };
+
+    // Converts 'localhost' to the running local backend endpoint
+    if (localUri && theUrl === 'localhost') {
+        theUrl = localUri;
+    }
 
     if (!!theUrl && !fileSchemeTester.test(theUrl)) {
         config.webPreferences = {
@@ -170,17 +185,20 @@ if (isMaster) {
     app.on('ready', () => {
         // Check whether we are in bundled application or development mode.
         const devMode = process.defaultApp || /node_modules[\\/]electron[\\/]/.test(process.execPath);
+
         const mainWindow = createNewWindow();
-        const loadMainWindow = (port) => {
-            mainWindow.loadURL('file://' + join(__dirname, '../../lib/index.html') + '?port=' + port);
+        const loadMainWindow = (uri) => {
             // mainWindow.loadURL(\`http://localhost:\${port}\`);
+            mainWindow.loadURL(uri);
         };
+        localUriEvent.once('update', loadMainWindow);
+
         const mainPath = join(__dirname, '..', 'backend', 'main');
         // We need to distinguish between bundled application and development mode when starting the clusters.
         // See: https://github.com/electron/electron/issues/6337#issuecomment-230183287
         if (devMode) {
             require(mainPath).then(address => {
-                loadMainWindow(address.port);
+                resolveLocalUriFromPort(address.port)
             }).catch((error) => {
                 console.error(error);
                 app.exit(1);
@@ -188,7 +206,7 @@ if (isMaster) {
         } else {
             const cp = fork(mainPath);
             cp.on('message', (message) => {
-                loadMainWindow(message);
+                resolveLocalUriFromPort(message);
             });
             cp.on('error', (error) => {
                 console.error(error);
