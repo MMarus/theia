@@ -75,14 +75,19 @@ delete PROCESS_OPTIONS.env.ELECTRON_RUN_AS_NODE;
 
 @injectable()
 export abstract class AbstractHostedPluginManager implements HostedPluginManager {
-
-    @inject(HostedPluginSupport)
-    protected hostedPluginSupport: HostedPluginSupport;
-
     protected hostedInstanceProcess: cp.ChildProcess;
     protected processOptions: cp.SpawnOptions;
     protected isPluginRunnig: boolean = false;
     protected instanceUri: URI;
+
+    protected hostedPluginSupport: HostedPluginSupport;
+
+    constructor(
+        @inject(HostedPluginSupport) hostedPluginSupport: HostedPluginSupport
+    ) {
+        this.hostedPluginSupport = hostedPluginSupport;
+        this.isPluginRunnig = false;
+    }
 
     isRunning(): boolean {
         return this.isPluginRunnig;
@@ -234,6 +239,12 @@ export abstract class AbstractHostedPluginManager implements HostedPluginManager
 export class NodeHostedPluginRunner extends AbstractHostedPluginManager {
     @inject(ContributionProvider) @named(Symbol.for(HostedPluginUriPostProcessorSymbolName))
     protected readonly uriPostProcessors: ContributionProvider<HostedPluginUriPostProcessor>;
+
+    constructor(
+        @inject(HostedPluginSupport) hostedPluginSupport: HostedPluginSupport
+    ) {
+        super(hostedPluginSupport);
+    }
 
     protected async postProcessInstanceUri(uri: URI): Promise<URI> {
         for (const uriPostProcessor of this.uriPostProcessors.getContributions()) {
