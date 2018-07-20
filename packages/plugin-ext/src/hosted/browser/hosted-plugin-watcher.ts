@@ -16,15 +16,24 @@
 import { injectable } from "inversify";
 import { Emitter, Event } from '@theia/core/lib/common/event';
 import { HostedPluginClient } from "../../common/plugin-protocol";
+import { LogPart } from "../../common/types";
 
 @injectable()
 export class HostedPluginWatcher {
     private onPostMessage = new Emitter<string[]>();
+    private onLogMessage = new Emitter<LogPart>();
+
     getHostedPluginClient(): HostedPluginClient {
         const messageEmitter = this.onPostMessage;
+        const logEmitter = this.onLogMessage;
         return {
             postMessage(message: string): Promise<void> {
                 messageEmitter.fire(JSON.parse(message));
+                return Promise.resolve();
+            },
+            hostedInstanceLog(logPart: LogPart): Promise<void> {
+                console.log("GOT LOGPART:" + logPart);
+                logEmitter.fire(logPart);
                 return Promise.resolve();
             }
         };
@@ -32,5 +41,9 @@ export class HostedPluginWatcher {
 
     get onPostMessageEvent(): Event<string[]> {
         return this.onPostMessage.event;
+    }
+
+    get onLogMessageEvent(): Event<LogPart> {
+        return this.onLogMessage.event;
     }
 }

@@ -20,7 +20,9 @@ import * as fs from "fs";
 import * as net from "net";
 import URI from '@theia/core/lib/common/uri';
 import { ContributionProvider } from "@theia/core/lib/common/contribution-provider";
+import { LogType } from "./../../common/types";
 import { HostedPluginUriPostProcessor, HostedPluginUriPostProcessorSymbolName } from "./hosted-plugin-uri-postprocessor";
+import { HostedPluginSupport } from "./hosted-plugin";
 const processTree = require('ps-tree');
 
 export const HostedPluginManager = Symbol('HostedPluginManager');
@@ -74,14 +76,13 @@ delete PROCESS_OPTIONS.env.ELECTRON_RUN_AS_NODE;
 @injectable()
 export abstract class AbstractHostedPluginManager implements HostedPluginManager {
 
+    @inject(HostedPluginSupport)
+    protected hostedPluginSupport: HostedPluginSupport;
+
     protected hostedInstanceProcess: cp.ChildProcess;
     protected processOptions: cp.SpawnOptions;
     protected isPluginRunnig: boolean = false;
     protected instanceUri: URI;
-
-    constructor() {
-        this.isPluginRunnig = false;
-    }
 
     isRunning(): boolean {
         return this.isPluginRunnig;
@@ -175,6 +176,9 @@ export abstract class AbstractHostedPluginManager implements HostedPluginManager
             this.hostedInstanceProcess.on('exit', () => { this.isPluginRunnig = false; });
             this.hostedInstanceProcess.stdout.addListener('data', outputListener);
 
+            this.hostedInstanceProcess.stdout.addListener('data', this.logStdOut);
+            this.hostedInstanceProcess.stderr.addListener('data', this.logStdErr);
+
             setTimeout(() => {
                 if (!started) {
                     this.terminate();
@@ -209,6 +213,21 @@ export abstract class AbstractHostedPluginManager implements HostedPluginManager
         });
     }
 
+    protected logStdOut(data: string | Buffer) {
+        console.log(data.toString());
+        this.hostedPluginSupport.sendLog({
+            data: data.toString(),
+            type: LogType.Info
+        });
+    }
+
+    protected logStdErr(data: string | Buffer) {
+        console.log(data.toString());
+        this.hostedPluginSupport.sendLog({
+            data: data.toString(),
+            type: LogType.Error
+        });
+    }
 }
 
 @injectable()
