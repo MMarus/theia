@@ -137,11 +137,11 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
         const history = await this.localStorageService.getData<string[]>(ElectronRemoteHistory.KEY, []);
         const encoded = encodeURI(url);
         if (encoded) {
-            const currentIndex = history.indexOf(encoded);
-            if (currentIndex === -1) {
-                history.unshift(encoded);
+            const index = history.indexOf(encoded);
+            if (index >= 0) {
+                history.splice(index);
             }
-
+            history.unshift(encoded);
             this.localStorageService.setData(ElectronRemoteHistory.KEY, history);
         }
     }
@@ -151,18 +151,18 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
     }
 
     protected async computeHistoryCache(): Promise<RemoteEntry[]> {
-        const history = (await this.history).map(url => new CachedRemoteEntry(url, RemoteEntryGroups[RemoteEntryGroups.History]));
-        return this.accumulateResponses(history, this.timeout);
+        return this.accumulateResponses(
+            (await this.history).map(
+                url => new CachedRemoteEntry(url, RemoteEntryGroups[RemoteEntryGroups.History])
+            ), this.timeout);
     }
 
     protected async accumulateResponses(input: RemoteEntry[], timeout: number): Promise<RemoteEntry[]> {
         const output: RemoteEntry[] = [];
-        Promise.all(input
-            .map(async entry => {
-                await entry.poll(timeout).catch(e => void 0);
-                output.push(entry);
-            })
-        );
+        input.forEach(async entry => {
+            await entry.poll(timeout).catch(e => void 0);
+            output.push(entry);
+        });
         await delay(timeout);
         return output.slice(0);
     }
@@ -187,9 +187,9 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
 
     async onType(lookFor: string, acceptor: (items: QuickOpenItem[]) => void): Promise<void> {
         const defaultSchemes = ['http', 'https'];
+        const items: QuickOpenItem[] = [];
         const inputResponses = [];
         const inputEntries = [];
-        const items: QuickOpenItem[] = [];
 
         // Add a way to open a local electron window
         if (ApplicationLocation.isRemote()) {
