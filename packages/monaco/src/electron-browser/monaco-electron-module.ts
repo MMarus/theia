@@ -36,7 +36,6 @@ const uriFromPath = (filePath: string) => {
 };
 
 const isHttp = /https?:/.test(self.location.href);
-// console.log('http?', isHttp);
 
 export default loadVsRequire(global)
     .then(vsRequire => {
@@ -48,7 +47,7 @@ export default loadVsRequire(global)
         // workaround monaco-typescript not understanding the environment
         s.process.browser = true;
 
-        // vscode-loader monkey-patching
+        // vscode-loader patching: https://github.com/Microsoft/vscode-loader/issues/12
         if (isHttp) {
             Object.defineProperty(s.AMDLoader.Environment.prototype, 'isNode', {
                 get: () => false
