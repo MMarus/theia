@@ -14,34 +14,20 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { injectable } from 'inversify';
+export type ApplicationLocation = 'local' | 'remote';
+export namespace ApplicationLocation {
 
-export enum ConnectionType {
-    Local = 0,
-    Remote,
-}
+    export const location: ApplicationLocation = /^file:/.test(self.location.href) ? 'local' : 'remote';
 
-export const ConnectionStateService = Symbol('ConnectionStateService');
-export interface ConnectionStateService {
-    getState(): string;
-    isLocal(): boolean;
-    isRemote(): boolean;
-}
-
-@injectable()
-export class DefaultConnectionStateService {
-
-    protected state: ConnectionType = /^file:/.test(self.location.href) ? ConnectionType.Local : ConnectionType.Remote;
-
-    getState(): string {
-        return ConnectionType[this.state];
+    export function getLocation(): ApplicationLocation {
+        return location;
     }
 
-    isLocal(): boolean {
-        return this.state === ConnectionType.Local;
+    export function isLocal(): boolean {
+        return location === 'local';
     }
 
-    isRemote(): boolean {
-        return this.state === ConnectionType.Remote;
+    export function isRemote(): boolean {
+        return location === 'remote';
     }
 }

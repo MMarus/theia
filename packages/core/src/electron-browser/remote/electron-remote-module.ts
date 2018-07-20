@@ -18,11 +18,8 @@ import { ContainerModule } from 'inversify';
 import { CommandContribution, MenuContribution } from "../../common";
 import { KeybindingContribution } from '../../browser';
 import { ElectronRemoteContribution } from './electron-remote-contribution';
-import { ConnectionStateService, DefaultConnectionStateService } from './connection-state-service';
 
 export default new ContainerModule(bind => {
-    bind(ConnectionStateService).to(DefaultConnectionStateService).inSingletonScope();
-
     bind(ElectronRemoteContribution).toSelf().inSingletonScope();
     for (const serviceIdentifier of [KeybindingContribution, CommandContribution, MenuContribution]) {
         bind(serviceIdentifier).toService(ElectronRemoteContribution);

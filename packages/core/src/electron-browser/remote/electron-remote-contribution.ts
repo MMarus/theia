@@ -28,7 +28,7 @@ import {
 import { CommonMenus } from '../../browser';
 import { WindowService } from '../../browser/window/window-service';
 import { timeout as delay } from '../../common/promise-util';
-import { ConnectionStateService } from './connection-state-service';
+import { ApplicationLocation } from './electron-application-location';
 
 export enum RemoteEntryGroups {
     Input = 0,
@@ -120,7 +120,6 @@ export class CachedRemoteEntry implements RemoteEntry {
 @injectable()
 export class ElectronRemoteContribution implements QuickOpenModel, CommandContribution, MenuContribution, KeybindingContribution {
 
-    @inject(ConnectionStateService) protected readonly connectionState: ConnectionStateService;
     @inject(StorageService) protected readonly localStorageService: StorageService;
     @inject(QuickOpenService) protected readonly quickOpenService: QuickOpenService;
     @inject(WindowService) protected readonly windowService: WindowService;
@@ -193,7 +192,7 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
         const items: QuickOpenItem[] = [];
 
         // Add a way to open a local electron window
-        if (this.connectionState.isRemote()) {
+        if (ApplicationLocation.isRemote()) {
             items.push(new QuickOpenGroupItem({
                 label: 'Localhost Application',
                 groupLabel: 'Electron',
@@ -264,8 +263,8 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
         });
 
         registry.registerCommand(ElectronRemoteCommands.DISCONNECT_FROM_REMOTE, {
-            isEnabled: () => this.connectionState.isRemote(),
-            isVisible: () => this.connectionState.isRemote(),
+            isEnabled: () => ApplicationLocation.isRemote(),
+            isVisible: () => ApplicationLocation.isRemote(),
             execute: () => {
                 this.windowService.openNewWindow('localhost');
                 close();
@@ -289,7 +288,7 @@ export class ElectronRemoteContribution implements QuickOpenModel, CommandContri
             order: 'z4',
         });
         // Do not load the disconnect button if we are not on a remote server
-        if (this.connectionState.isRemote()) {
+        if (ApplicationLocation.isRemote()) {
             registry.registerMenuAction(ElectronMenus.ELECTRON_REMOTE, {
                 commandId: ElectronRemoteCommands.DISCONNECT_FROM_REMOTE.id,
                 order: 'z5',
