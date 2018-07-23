@@ -80,14 +80,8 @@ export abstract class AbstractHostedPluginManager implements HostedPluginManager
     protected isPluginRunnig: boolean = false;
     protected instanceUri: URI;
 
-    protected hostedPluginSupport: HostedPluginSupport;
-
-    constructor(
-        @inject(HostedPluginSupport) hostedPluginSupport: HostedPluginSupport
-    ) {
-        this.hostedPluginSupport = hostedPluginSupport;
-        this.isPluginRunnig = false;
-    }
+    @inject(HostedPluginSupport)
+    protected readonly hostedPluginSupport: HostedPluginSupport;
 
     isRunning(): boolean {
         return this.isPluginRunnig;
@@ -181,8 +175,8 @@ export abstract class AbstractHostedPluginManager implements HostedPluginManager
             this.hostedInstanceProcess.on('exit', () => { this.isPluginRunnig = false; });
             this.hostedInstanceProcess.stdout.addListener('data', outputListener);
 
-            this.hostedInstanceProcess.stdout.addListener('data', this.logStdOut);
-            this.hostedInstanceProcess.stderr.addListener('data', this.logStdErr);
+            this.hostedInstanceProcess.stdout.addListener('data', (data) => this.logStdOut(data));
+            this.hostedInstanceProcess.stderr.addListener('data', (data) => this.logStdErr(data));
 
             setTimeout(() => {
                 if (!started) {
@@ -219,7 +213,6 @@ export abstract class AbstractHostedPluginManager implements HostedPluginManager
     }
 
     protected logStdOut(data: string | Buffer) {
-        console.log(data.toString());
         this.hostedPluginSupport.sendLog({
             data: data.toString(),
             type: LogType.Info
@@ -227,7 +220,6 @@ export abstract class AbstractHostedPluginManager implements HostedPluginManager
     }
 
     protected logStdErr(data: string | Buffer) {
-        console.log(data.toString());
         this.hostedPluginSupport.sendLog({
             data: data.toString(),
             type: LogType.Error
@@ -239,12 +231,6 @@ export abstract class AbstractHostedPluginManager implements HostedPluginManager
 export class NodeHostedPluginRunner extends AbstractHostedPluginManager {
     @inject(ContributionProvider) @named(Symbol.for(HostedPluginUriPostProcessorSymbolName))
     protected readonly uriPostProcessors: ContributionProvider<HostedPluginUriPostProcessor>;
-
-    constructor(
-        @inject(HostedPluginSupport) hostedPluginSupport: HostedPluginSupport
-    ) {
-        super(hostedPluginSupport);
-    }
 
     protected async postProcessInstanceUri(uri: URI): Promise<URI> {
         for (const uriPostProcessor of this.uriPostProcessors.getContributions()) {

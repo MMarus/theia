@@ -22,7 +22,7 @@ import { OutputPreferences } from "./output-preferences";
 export class OutputChannelManager {
     protected readonly channels = new Map<string, OutputChannel>();
 
-    private readonly channelDeleteEmitter = new Emitter<{channelName: string}>();
+    private readonly channelDeleteEmitter = new Emitter<{ channelName: string }>();
     private readonly channelAddedEmitter = new Emitter<OutputChannel>();
     readonly onChannelDelete = this.channelDeleteEmitter.event;
     readonly onChannelAdded = this.channelAddedEmitter.event;
@@ -43,7 +43,7 @@ export class OutputChannelManager {
 
     deleteChannel(name: string): void {
         this.channels.delete(name);
-        this.channelDeleteEmitter.fire({channelName: name});
+        this.channelDeleteEmitter.fire({ channelName: name });
     }
 
     getChannels(): OutputChannel[] {
@@ -53,13 +53,13 @@ export class OutputChannelManager {
 
 export class OutputChannel {
 
-    private readonly visibilityChangeEmitter = new Emitter<{visible: boolean}>();
+    private readonly visibilityChangeEmitter = new Emitter<{ visible: boolean }>();
     private readonly contentChangeEmitter = new Emitter<OutputChannel>();
     private lines: string[] = [];
     private currentLine: string | undefined;
     private visible: boolean = true;
 
-    readonly onVisibilityChange: Event<{visible: boolean}> = this.visibilityChangeEmitter.event;
+    readonly onVisibilityChange: Event<{ visible: boolean }> = this.visibilityChangeEmitter.event;
     readonly onContentChange: Event<OutputChannel> = this.contentChangeEmitter.event;
 
     constructor(readonly name: string, readonly preferences: OutputPreferences) { }
@@ -95,7 +95,7 @@ export class OutputChannel {
 
     setVisibility(visible: boolean): void {
         this.visible = visible;
-        this.visibilityChangeEmitter.fire({visible});
+        this.visibilityChangeEmitter.fire({ visible });
     }
 
     getLines(): string[] {
