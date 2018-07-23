@@ -106,8 +106,13 @@ export class WidgetManager {
     protected async doGetWidget<T extends Widget>(key: string): Promise<T | undefined> {
         const existingWidgetPromise = this.widgetPromises.get(key);
         if (existingWidgetPromise) {
-            const existingWidget = await existingWidgetPromise;
-            return existingWidget as T;
+            try {
+                return await existingWidgetPromise as T;
+            } catch (e) {
+                this.logger.error(e);
+                this.widgetPromises.delete(key);
+                return undefined;
+            }
         }
         return undefined;
     }
