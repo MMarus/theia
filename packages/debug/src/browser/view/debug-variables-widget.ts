@@ -73,9 +73,9 @@ export class DebugVariablesWidget extends TreeWidget {
         this.model.refresh(variableNode);
     }
 
-    protected render(): React.ReactNode {
+    protected renderTree(model: TreeModel): React.ReactNode {
         const header = h.div({ className: "theia-header" }, "Variables");
-        return React.createElement('div', [header, super.render()]);
+        return React.createElement('div', [header, super.renderTree(model)]);
     }
 
     protected renderCaption(node: TreeNode, props: NodeProps): React.ReactNode {

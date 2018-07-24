@@ -145,8 +145,8 @@ function createDebugTargetContainer(context: interfaces.Context, debugSession: D
     child.bind(DebugVariablesTree).toSelf();
     child.rebind(Tree).toDynamicValue(ctx => ctx.container.get(DebugVariablesTree));
 
+    child.unbind(TreeWidget);
     child.bind(DebugVariablesWidget).toSelf();
-    child.rebind(TreeWidget).toDynamicValue(ctx => ctx.container.get(DebugVariablesWidget));
 
     return child;
 }

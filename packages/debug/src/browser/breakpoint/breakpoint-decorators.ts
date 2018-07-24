@@ -45,8 +45,7 @@ export class ActiveLineDecorator extends EditorDecorator {
     }
 
     applyDecorations(editor?: TextEditor): void {
-        const editors = editor ? [editor] : this.editorManager.all.map(widget => widget.editor);
-        editors.forEach(e => this.setDecorations(e, []));
+        this.editorManager.all.map(widget => this.setDecorations(widget.editor, []));
 
         const session = this.debugSessionManager.getActiveDebugSession();
         if (!session) {
