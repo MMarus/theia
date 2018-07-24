@@ -28,13 +28,20 @@ export class FileSystemListener implements FileSystemClient {
     }
 
     async shouldOverwrite(file: FileStat, stat: FileStat): Promise<boolean> {
-        const dialog = new ConfirmDialog({
-            title: `The file '${file.uri}' has been changed on the file system.`,
-            msg: 'Do you want to overwrite the changes made on the file system?',
-            ok: 'Yes',
-            cancel: 'No'
-        });
-        return dialog.open();
+        try {
+            const dialog = new ConfirmDialog({
+                title: `The file '${file.uri}' has been changed on the file system.`,
+                msg: 'Do you want to overwrite the changes made on the file system?',
+                ok: 'Yes',
+                cancel: 'No'
+            });
+            return await dialog.open();
+        } catch (error) {
+            if (error) {
+                console.error(error);
+            }
+        }
+        return false;
     }
 
 }

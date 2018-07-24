@@ -139,13 +139,20 @@ export class FileTreeModel extends TreeModelImpl implements LocationService {
     }
 
     protected async shouldReplace(fileName: string): Promise<boolean> {
-        const dialog = new ConfirmDialog({
-            title: 'Replace file',
-            msg: `File '${fileName}' already exists in the destination folder. Do you want to replace it?`,
-            ok: 'Yes',
-            cancel: 'No'
-        });
-        return dialog.open();
+        try {
+            const dialog = new ConfirmDialog({
+                title: 'Replace file',
+                msg: `File '${fileName}' already exists in the destination folder. Do you want to replace it?`,
+                ok: 'Yes',
+                cancel: 'No'
+            });
+            return await dialog.open();
+        } catch (error) {
+            if (error) {
+                console.error(error);
+            }
+        }
+        return false;
     }
 
     upload(node: DirNode, items: DataTransferItemList): void {

@@ -119,6 +119,10 @@ export class WorkspaceCommandContribution implements CommandContribution {
                         this.fileSystem.createFile(fileUri.toString()).then(() => {
                             open(this.openerService, fileUri);
                         });
+                    }).catch(error => {
+                        if (error) {
+                            console.error(error);
+                        }
                     });
                 }
             })
@@ -135,7 +139,11 @@ export class WorkspaceCommandContribution implements CommandContribution {
                     });
                     dialog.open().then(name =>
                         this.fileSystem.createFolder(parentUri.resolve(name).toString())
-                    );
+                    ).catch(error => {
+                        if (error) {
+                            console.error(error);
+                        }
+                    });
                 }
             })
         }));
@@ -149,7 +157,11 @@ export class WorkspaceCommandContribution implements CommandContribution {
                     });
                     dialog.open().then(name =>
                         this.fileSystem.move(uri.toString(), uri.parent.resolve(name).toString())
-                    );
+                    ).catch(error => {
+                        if (error) {
+                            console.error(error);
+                        }
+                    });
                 }
             })
         }));
@@ -185,10 +197,17 @@ export class WorkspaceCommandContribution implements CommandContribution {
                     title: `Delete File${uris.length === 1 ? '' : 's'}`,
                     msg,
                 });
-                if (await dialog.open()) {
-                    // Make sure we delete the longest paths first, they might be nested. Longer paths come first.
-                    uris.sort((left, right) => right.toString().length - left.toString().length);
-                    await Promise.all(uris.map(uri => uri.toString()).map(uri => this.fileSystem.delete(uri)));
+
+                try {
+                    if (await dialog.open()) {
+                        // Make sure we delete the longest paths first, they might be nested. Longer paths come first.
+                        uris.sort((left, right) => right.toString().length - left.toString().length);
+                        await Promise.all(uris.map(uri => uri.toString()).map(uri => this.fileSystem.delete(uri)));
+                    }
+                } catch (error) {
+                    if (error) {
+                        console.error(error);
+                    }
                 }
             }
         }));

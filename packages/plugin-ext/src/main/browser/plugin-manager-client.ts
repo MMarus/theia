@@ -172,13 +172,19 @@ export class HostedPluginManagerClient {
         const rootNode = DirNode.createRoot(rootStat, name, label);
         const dialog = this.fileDialogFactory({ title: HostedPluginCommands.SELECT_PATH.label! });
         dialog.model.navigateTo(rootNode);
-        const node = await dialog.open();
-        if (node) {
-            if (await this.hostedPluginServer.isPluginValid(node.uri.toString())) {
-                this.pluginLocation = node.uri;
-                this.messageService.info('Plugin folder is set to: ' + node.uri.toString());
-            } else {
-                this.messageService.error('Specified folder does not contain valid plugin.');
+        try {
+            const node = await dialog.open();
+            if (node) {
+                if (await this.hostedPluginServer.isPluginValid(node.uri.toString())) {
+                    this.pluginLocation = node.uri;
+                    this.messageService.info('Plugin folder is set to: ' + node.uri.toString());
+                } else {
+                    this.messageService.error('Specified folder does not contain valid plugin.');
+                }
+            }
+        } catch (error) {
+            if (error) {
+                console.error(error);
             }
         }
     }
@@ -242,6 +248,11 @@ class OpenHostedInstanceLinkDialog extends AbstractDialog<string> {
         this.openButton.onclick = () => {
             this.windowService.openNewWindow(uri);
         };
-        this.open();
+
+        this.open().catch(error => {
+            if (error) {
+                console.error(error);
+            }
+        });
     }
 }

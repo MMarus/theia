@@ -67,8 +67,14 @@ export class WorkspaceFrontendContribution implements CommandContribution, MenuC
                     const rootNode = DirNode.createRoot(parentStat, name, label);
                     const dialog = this.fileDialogFactory({ title: WorkspaceCommands.OPEN.label! });
                     dialog.model.navigateTo(rootNode);
-                    const node = await dialog.open();
-                    this.openFile(node);
+                    try {
+                        const node = await dialog.open();
+                        this.openFile(node);
+                    } catch (error) {
+                        if (error) {
+                            console.error(error);
+                        }
+                    }
                 }
             }
         });
@@ -90,8 +96,14 @@ export class WorkspaceFrontendContribution implements CommandContribution, MenuC
             title: 'Close Workspace',
             msg: 'Do you really want to close the workspace?'
         });
-        if (await dialog.open()) {
-            this.workspaceService.close();
+        try {
+            if (await dialog.open()) {
+                this.workspaceService.close();
+            }
+        } catch (error) {
+            if (error) {
+                console.error(error);
+            }
         }
     }
 

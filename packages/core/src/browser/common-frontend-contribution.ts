@@ -477,6 +477,10 @@ export class CommonFrontendContribution implements MenuContribution, CommandCont
     }
 
     protected async openAbout() {
-        this.aboutDialog.open();
+        this.aboutDialog.open().catch(error => {
+            if (error) {
+                console.error(error);
+            }
+        });
     }
 }

@@ -200,11 +200,20 @@ export class GitSyncService {
         });
     }
 
-    protected confirm(title: string, msg: string): Promise<boolean> {
-        return new ConfirmDialog({ title, msg, }).open();
+    protected async confirm(title: string, msg: string): Promise<boolean> {
+        try {
+            return await new ConfirmDialog({ title, msg, }).open();
+        } catch (error) {
+            if (error) {
+                console.error(error);
+            }
+        }
+
+        return false;
     }
 
 }
+
 export namespace GitSyncService {
     export type SyncMethod = 'pull-push' | 'rebase-push' | 'force-push';
 }

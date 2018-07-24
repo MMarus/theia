@@ -151,6 +151,14 @@ export abstract class AbstractDialog<T> extends BaseWidget {
         });
     }
 
+    close(): void {
+        if (this.reject) {
+            this.reject(undefined);
+        }
+
+        super.close();
+    }
+
     protected onUpdateRequest(msg: Message): void {
         super.onUpdateRequest(msg);
         if (this.resolve) {
@@ -174,6 +182,7 @@ export abstract class AbstractDialog<T> extends BaseWidget {
     }
 
     abstract get value(): T;
+
     isValid(value: T): string {
         return '';
     }
@@ -204,6 +213,8 @@ export class ConfirmDialogProps extends DialogProps {
 
 export class ConfirmDialog extends AbstractDialog<boolean> {
 
+    protected confirmed = true;
+
     constructor(
         @inject(ConfirmDialogProps) protected readonly props: ConfirmDialogProps
     ) {
@@ -220,7 +231,6 @@ export class ConfirmDialog extends AbstractDialog<boolean> {
         this.accept();
     }
 
-    protected confirmed = true;
     get value(): boolean {
         return this.confirmed;
     }
